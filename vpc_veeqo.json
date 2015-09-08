@@ -1,7 +1,7 @@
 {
   "AWSTemplateFormatVersion" : "2010-09-09",
 
-  "Description": "VPC, Subnets, IGW, VPN GW, Route Tables, Security Groups, Auto Scaling Array",
+  "Description": "VPC, Subnets, IGW, VPN GW, Route Tables, Security Groups, Subnet Groups and routing",
 
   "Parameters" : {
 
@@ -351,9 +351,17 @@
                        { "Ref" : "DbPrivateSubnetB" }],
         "Tags" : [ {"Key" : "Name", "Value" : "Veeqo"} ]
       }
-    }
-  },
+    },
 
+    "CacheSubnetGroup" : {
+      "Type" : "AWS::ElastiCache::SubnetGroup",
+      "Properties" : {
+        "Description" : "Veeqo Cache Subnet group",
+        "SubnetIds" : [{ "Ref" : "DbPrivateSubnetA" },
+                       { "Ref" : "DbPrivateSubnetB" }]
+      }
+    }
+  },  
 
   "Outputs": {
 
@@ -382,6 +390,11 @@
       "Description" : "ID for DB Subnet group"
     },
 
+	"CacheSubnetGroup" : {
+      "Value" : { "Ref" : "CacheSubnetGroup" },
+      "Description" : "ID for Cache Subnet group"
+    },	
+	
     "SshSG" : {
       "Value" : { "Ref" : "SshSG" },
       "Description" : "ID for security group \"Ssh-SG\""
@@ -401,10 +414,12 @@
       "Value" : { "Ref" : "WebSG" },
       "Description" : "ID for security group \"Web-SG\""
     },
+	
 	"RedisSG" : {
       "Value" : { "Ref" : "RedisSG" },
       "Description" : "ID for security group \"Redis-SG\""
     },
+	
 	"RdsSG" : {
       "Value" : { "Ref" : "RdsSG" },
       "Description" : "ID for security group \"Rds-SG\""
