@@ -1,15 +1,27 @@
 #!/bin/bash
-### This script gets latest version of cisco config file and push it to git if there are any differencies found ###
-### Author: Elias Nichupienko ###
+### This script gets latest version ###
+### of cisco config file and push   ###
+### it to git if there are any      ###
+### differencies found              ###
+### Author: Elias Nichupienko       ###
+### Usage: cisco.sh login pass host ###
 
 today=`date +%Y%m%d`
 ciscoName="cat7604"
 workdir=/backup
+user=$1
+pass=$2
+host=$3
+config="config"
 
 cd $workdir
 
 dowlonad(){
-	download > $ciscoName$today
+	lftp -u $user,$pass ftp://$host <<EOF
+	get $config
+	bye
+EOF
+	mv config $ciscoName$today
 }
 
 compare(){
