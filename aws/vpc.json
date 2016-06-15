@@ -1,0 +1,592 @@
+{
+  "AWSTemplateFormatVersion" : "2010-09-09",
+
+  "Description": "VPC, Subnets, IGW, VPN GW, Route Tables, Security Groups, NAT instances, Elastic Load Balancer, Auto Scaling Array",
+
+  "Parameters" : {
+
+    "VpcName": {
+      "Default": "Infitto #1",
+      "Description" : "VPC Name",
+      "Type": "String"
+    },
+
+    "VpcCidrBlock": {
+      "Default": "172.20.0.0/16",
+      "Description" : "VPC CIDR Block",
+      "Type": "String"
+    },
+
+    "AZs" : {
+      "Type" : "CommaDelimitedList",
+      "Default" : "eu-central-1a, eu-central-1b",
+      "Description" : "The list of active AZ's"
+    },
+
+    "SubnetsPublic" : {
+      "Type" : "CommaDelimitedList",
+      "Default" : "172.20.0.0/24, 172.20.1.0/24",
+      "Description" : "IP Ranges (CIDR) for Public Subnets"
+    },
+
+    "SubnetsAppPrivate" : {
+      "Type" : "CommaDelimitedList",
+      "Default" : "172.20.128.0/24, 172.20.129.0/24",
+      "Description" : "IP Ranges (CIDR) for Application Private Subnets"
+    },
+
+    "SubnetsDbPrivate" : {
+      "Type" : "CommaDelimitedList",
+      "Default" : "172.20.130.0/24, 172.20.131.0/24",
+      "Description" : "IP Ranges (CIDR) for DB Private Subnets"
+    },
+
+    "IntDomainName": {
+      "Default": "infitto.com",
+      "Description" : "Internal Domain Name",
+      "Type": "String"
+    },
+
+    "InstsKey": {
+      "Default": "infitto_key",
+      "Description" : "Key name for NAT and Application Instances",
+      "Type": "String"
+    },
+
+
+    "InitS3BucketName" : {
+      "Default": "Infitto-tools",
+      "Description" : "S3 Bucket Name with initial configuration script.",
+      "Type": "String"
+    },
+
+    "IAMRole" : {
+      "Default" : "Infitto",
+      "Description" : "IAM Role to automatic attach to Instances in CDN and Media Tier",
+      "Type" : "String"
+    },
+
+    "PHPAppAmi": {
+      "Default": "ami-04003319",
+      "Description" : "AMI Id for Infitto Application Instances",
+      "Type": "String"
+    },
+
+    "PHPAppInstType": {
+      "Default": "t2.micro",
+      "Description" : "Instance type for Infitto Application Instances",
+      "Type": "String"
+    },
+
+    "PHPAppChefEnv" : {
+      "Default": "Infitto_staging",
+      "Description" : "Chef Environment",
+      "Type": "String"
+    },
+
+    "PHPAppChefRole" : {
+      "Default": "nothing",
+      "Description" : "Chef Role for Infitto Application Instances",
+      "Type": "String"
+    },
+
+    "PHPAppArrMinSize": {
+      "Default": "1",
+      "Description" : "Minimum instances count in Infitto Application Array",
+      "Type": "String"
+    },
+
+    "PHPAppArrMaxSize": {
+      "Default": "1",
+      "Description" : "Maximum instances count in Infitto Application Array",
+      "Type": "String"
+    },
+    "PHPAppArrAlarmCpuHigh": {
+      "Default": "70",
+      "Description" : "Infitto Application Group Scale-up if CPU > this value",
+      "Type": "String"
+    },
+    "PHPAppArrAlarmCpuLow": {
+      "Default": "10",
+      "Description" : "Infitto Application Group Scale-down if CPU < this value",
+      "Type": "String"
+    },
+    "PHPAppArrAlarmCpuHighPeriod": {
+      "Default": "180",
+      "Description" : "Infitto Application Group: the period between checks of \"CPU High\" metric (in seconds).",
+      "Type": "String"
+    },
+    "PHPAppArrAlarmCpuLowPeriod": {
+      "Default": "180",
+      "Description" : "Infitto Application Group: the period between checks of \"CPU Low\" metric (in seconds).",
+      "Type": "String"
+    },
+    "PHPAppArrAlarmCpuHighEvalPeriod": {
+      "Default": "2",
+      "Description" : "Infitto Application Group: The number of checks before Scale-Up action.",
+      "Type": "String"
+    },
+    "PHPAppArrAlarmCpuLowEvalPeriod": {
+      "Default": "5",
+      "Description" : "Infitto Application Group: The number of checks before Scale-Down action.",
+      "Type": "String"
+    },
+    "PHPAppArrScaleUpAdjustment": {
+      "Default": "2",
+      "Description" : "Infitto Application Group: Scaling Adjustment to Scale Up",
+      "Type": "String"
+    },
+    "PHPAppArrScaleDownAdjustment": {
+      "Default": "-2",
+      "Description" : "Infitto Application Group: Scaling Adjustment to Scale Down",
+      "Type": "String"
+    },
+    "PHPAppArrScaleUpCooldown": {
+      "Default": "120",
+      "Description" : "Infitto Application Group: Scaling Cooldown period to Scale Up",
+      "Type": "String"
+    },
+    "PHPAppArrScaleDownCooldown": {
+      "Default": "120",
+      "Description" : "Infitto Application Group: Scaling Cooldown period to Scale Down",
+      "Type": "String"
+    },
+    "PHPAppArrHealthCheckTarget" : {
+      "Description" : "ELB target health check URI for T Application Instances",
+      "Default" : "TCP:80",
+      "Type": "String"
+    }
+  },
+
+  "Mappings" : {
+    "NatRegion2Ami" : {
+      "us-west-2" : { "ami" : "ami-f032acc0" },
+      "us-east-1" : { "ami" : "ami-ad227cc4" },
+      "us-west-1" : { "ami" : "ami-d69aad93" },
+      "eu-west-1" : { "ami" : "ami-f3e30084" },
+      "ap-southeast-1" : { "ami" : "ami-f22772a0" },
+      "ap-northeast-1" : { "ami" : "ami-cd43d9cc" },
+      "ap-southeast-2" : { "ami" : "ami-3bae3201" },
+      "sa-east-1" : { "ami" : "ami-d78325ca" }
+    }
+  },
+
+  "Resources": {
+
+    "Vpc" : {
+      "Type" : "AWS::EC2::VPC",
+      "Properties" : {
+        "CidrBlock" : {"Ref" : "VpcCidrBlock"},
+        "EnableDnsSupport" : "true",
+        "EnableDnsHostnames" : "true",
+        "InstanceTenancy" : "default",
+        "Tags": [{"Key": "Name", "Value" : { "Ref" : "VpcName" }}]
+      }
+    },
+
+    "DhcpOptions" : {
+      "Type" : "AWS::EC2::DHCPOptions",
+      "Properties" : {
+       "DomainName" : { "Ref" : "IntDomainName" },
+        "DomainNameServers" : [ "AmazonProvidedDNS" ],
+        "Tags" : [ { "Key" : "Name", "Value" : "Custom DHCP Set" } ]
+      }
+    },
+
+    "DhcpOptionsAssoc" : { 
+      "Type" : "AWS::EC2::VPCDHCPOptionsAssociation",
+      "Properties" : {
+        "DhcpOptionsId" : { "Ref" : "DhcpOptions" },
+        "VpcId" : { "Ref" : "Vpc" }
+      }
+    },
+
+    "PublicSubnetA" : {
+      "Type" : "AWS::EC2::Subnet",
+      "Properties" : {
+        "VpcId" : { "Ref" : "Vpc" },
+        "CidrBlock" : { "Fn::Select" : [ "0", {"Ref": "SubnetsPublic"} ] },
+        "AvailabilityZone" : { "Fn::Select" : [ "0", {"Ref": "AZs"} ] },
+        "Tags": [{"Key": "Name", "Value" : "PublicSubnetA"}]
+      }
+    },
+
+    "PublicSubnetB" : {
+      "Type" : "AWS::EC2::Subnet",
+      "Properties" : {
+        "VpcId" : { "Ref" : "Vpc" },
+        "CidrBlock" : { "Fn::Select" : [ "1", {"Ref": "SubnetsPublic"} ] },
+        "AvailabilityZone" : { "Fn::Select" : [ "1", {"Ref": "AZs"} ] },
+        "Tags": [{"Key": "Name", "Value" : "PublicSubnetB"}]
+      }
+    },
+
+    "AppPrivateSubnetA" : {
+      "Type" : "AWS::EC2::Subnet",
+      "Properties" : {
+        "VpcId" : { "Ref" : "Vpc" },
+        "CidrBlock" : { "Fn::Select" : [ "0", {"Ref": "SubnetsAppPrivate"} ] },
+        "AvailabilityZone" : { "Fn::Select" : [ "0", {"Ref": "AZs"} ] },
+        "Tags": [{"Key": "Name", "Value" : "AppPrivateSubnetA"}]
+      }
+    },
+
+    "AppPrivateSubnetB" : {
+      "Type" : "AWS::EC2::Subnet",
+      "Properties" : {
+        "VpcId" : { "Ref" : "Vpc" },
+        "CidrBlock" : { "Fn::Select" : [ "1", {"Ref": "SubnetsAppPrivate"} ] },
+        "AvailabilityZone" : { "Fn::Select" : [ "1", {"Ref": "AZs"} ] },
+        "Tags": [{"Key": "Name", "Value" : "AppPrivateSubnetB"}]
+      }
+    },
+
+    "DbPrivateSubnetA" : {
+      "Type" : "AWS::EC2::Subnet",
+      "Properties" : {
+        "VpcId" : { "Ref" : "Vpc" },
+        "CidrBlock" : { "Fn::Select" : [ "0", {"Ref": "SubnetsDbPrivate"} ] },
+        "AvailabilityZone" : { "Fn::Select" : [ "0", {"Ref": "AZs"} ] },
+        "Tags": [{"Key": "Name", "Value" : "DbPrivateSubnetA"}]
+      }
+    },
+
+    "DbPrivateSubnetB" : {
+      "Type" : "AWS::EC2::Subnet",
+      "Properties" : {
+        "VpcId" : { "Ref" : "Vpc" },
+        "CidrBlock" : { "Fn::Select" : [ "1", {"Ref": "SubnetsDbPrivate"} ] },
+        "AvailabilityZone" : { "Fn::Select" : [ "1", {"Ref": "AZs"} ] },
+        "Tags": [{"Key": "Name", "Value" : "DbPrivateSubnetB"}]
+      }
+    },
+
+    "IGW" : {
+      "Type" : "AWS::EC2::InternetGateway",
+      "Properties" : {
+        "Tags" : [ {"Key" : "Name", "Value" : "IGW"}]
+      }
+    },
+
+    "AttachIGW" : {
+      "Type" : "AWS::EC2::VPCGatewayAttachment",
+      "Properties" : {
+        "VpcId" : { "Ref" : "Vpc" },
+        "InternetGatewayId" : { "Ref" : "IGW" }
+      }
+    },
+
+    "PubRouteTable": {
+      "Type" : "AWS::EC2::RouteTable",
+      "Properties" : {
+        "VpcId" : { "Ref" : "Vpc" },
+        "Tags" : [ { "Key" : "Name", "Value" : "Public" } ]
+      }
+    },
+
+    "PrivARouteTable": {
+      "Type" : "AWS::EC2::RouteTable",
+      "Properties" : {
+        "VpcId" : { "Ref" : "Vpc" },
+        "Tags" : [ { "Key" : "Name", "Value" : "Private A" } ]
+      }
+    },
+
+    "PrivBRouteTable": {
+      "Type" : "AWS::EC2::RouteTable",
+      "Properties" : {
+        "VpcId" : { "Ref" : "Vpc" },
+        "Tags" : [ { "Key" : "Name", "Value" : "Private B" } ]
+      }
+    },
+
+    "PubDefRoute" : {
+      "Type" : "AWS::EC2::Route",
+      "Properties" : {
+        "RouteTableId" : { "Ref" : "PubRouteTable" },
+        "DestinationCidrBlock" : "0.0.0.0/0",
+        "GatewayId" : { "Ref" : "IGW" }
+      }
+    },
+
+    "PrivADefRoute" : {
+      "Type" : "AWS::EC2::Route",
+      "Properties" : {
+        "RouteTableId" : { "Ref" : "PrivARouteTable" },
+        "DestinationCidrBlock" : "0.0.0.0/0",
+        "GatewayId" : { "Ref" : "IGW" }
+      }
+    },
+
+    "PrivBDefRoute" : {
+      "Type" : "AWS::EC2::Route",
+      "Properties" : {
+        "RouteTableId" : { "Ref" : "PrivBRouteTable" },
+        "DestinationCidrBlock" : "0.0.0.0/0",
+        "GatewayId" : { "Ref" : "IGW" }
+      }
+    },
+
+    "PublicSubnetARouteTableAssociation" : {
+      "Type" : "AWS::EC2::SubnetRouteTableAssociation",
+      "Properties" : {
+        "RouteTableId" : { "Ref" : "PubRouteTable" },
+        "SubnetId" : { "Ref" : "PublicSubnetA" }
+      }
+    },
+
+    "PublicSubnetBRouteTableAssociation" : {
+      "Type" : "AWS::EC2::SubnetRouteTableAssociation",
+      "Properties" : {
+        "RouteTableId" : { "Ref" : "PubRouteTable" },
+        "SubnetId" : { "Ref" : "PublicSubnetB" }
+      }
+    },
+
+    "AppPrivateSubnetARouteTableAssociation" : {
+      "Type" : "AWS::EC2::SubnetRouteTableAssociation",
+      "Properties" : {
+        "RouteTableId" : { "Ref" : "PrivARouteTable" },
+        "SubnetId" : { "Ref" : "AppPrivateSubnetA" }
+      }
+    },
+
+    "AppPrivateSubnetBRouteTableAssociation" : {
+      "Type" : "AWS::EC2::SubnetRouteTableAssociation",
+      "Properties" : {
+        "RouteTableId" : { "Ref" : "PrivBRouteTable" },
+        "SubnetId" : { "Ref" : "AppPrivateSubnetB" }
+      }
+    },
+
+    "DbPrivateSubnetARouteTableAssociation" : {
+      "Type" : "AWS::EC2::SubnetRouteTableAssociation",
+      "Properties" : {
+        "RouteTableId" : { "Ref" : "PrivARouteTable" },
+        "SubnetId" : { "Ref" : "DbPrivateSubnetA" }
+      }
+    },
+
+    "DbPrivateSubnetBRouteTableAssociation" : {
+      "Type" : "AWS::EC2::SubnetRouteTableAssociation",
+      "Properties" : {
+        "RouteTableId" : { "Ref" : "PrivBRouteTable" },
+        "SubnetId" : { "Ref" : "DbPrivateSubnetB" }
+      }
+    },
+    
+    "SshSG" : {
+      "Type" : "AWS::EC2::SecurityGroup",
+      "Properties" : {
+        "GroupDescription" : "Security Group for Ssh",
+        "VpcId" : {"Ref" : "Vpc"},
+        "SecurityGroupIngress" : [
+          { "IpProtocol" : "tcp", "FromPort" : "22", "ToPort" : "22", "CidrIp" : "0.0.0.0/0" }
+        ],
+        "SecurityGroupEgress" : [
+          { "IpProtocol" : "-1", "FromPort" : "0", "ToPort" : "0", "CidrIp" : "0.0.0.0/0" }
+        ],
+        "Tags": [{"Key": "Name", "Value" : "Ssh-SG"}]
+      }
+    },
+
+    "ElbSG" : {
+      "Type" : "AWS::EC2::SecurityGroup",
+      "Properties" : {
+        "GroupDescription" : "Security Group for Elastic Load Balancer",
+        "VpcId" : {"Ref" : "Vpc"},
+        "SecurityGroupIngress" : [
+            { "IpProtocol" : "tcp", "FromPort" : "80", "ToPort" : "80", "CidrIp" : "0.0.0.0/0" },
+            { "IpProtocol" : "tcp", "FromPort" : "443", "ToPort" : "443", "CidrIp" : "0.0.0.0/0" }
+        ],
+        "SecurityGroupEgress" : [
+            { "IpProtocol" : "-1",  "FromPort" : "0",  "ToPort" : "0",  "CidrIp" : "0.0.0.0/0" }
+        ],
+        "Tags": [{"Key": "Name", "Value" : "ELB-SG"}]
+      }
+    },
+
+    "PHPAppSG" : {
+      "Type" : "AWS::EC2::SecurityGroup",
+      "Properties" : {
+        "GroupDescription" : "Security Group for PHP Application Servers array",
+        "VpcId" : {"Ref" : "Vpc"},
+        "SecurityGroupIngress" : [
+            { "IpProtocol" : "tcp", "FromPort" : "80", "ToPort" : "80", "SourceSecurityGroupId" :  { "Ref" : "ElbSG" }  }
+        ],
+        "SecurityGroupEgress" : [
+            { "IpProtocol" : "-1",  "FromPort" : "0",  "ToPort" : "0",  "CidrIp" : "0.0.0.0/0" }
+        ],
+        "Tags": [{"Key": "Name", "Value" : "PHPApp-SG"}]
+      }
+    },
+
+    "RdsSG" : {
+      "Type" : "AWS::EC2::SecurityGroup",
+      "Properties" : {
+        "GroupDescription" : "Security Group for Relative Database Service",
+        "VpcId" : {"Ref" : "Vpc"},
+        "SecurityGroupIngress" : [
+            { "IpProtocol" : "tcp", "FromPort" : "3306", "ToPort" : "3306", "SourceSecurityGroupId" :  { "Ref" : "PHPAppSG" } }
+        ],
+        "SecurityGroupEgress" : [
+            { "IpProtocol" : "-1",  "FromPort" : "0",  "ToPort" : "0",  "CidrIp" : "0.0.0.0/0" }
+        ],
+        "Tags": [{"Key": "Name", "Value" : "RDS-SG"}]
+      }
+    },
+
+    "PHPInstanceProfile": {
+      "Type": "AWS::IAM::InstanceProfile",
+      "Properties": {
+        "Path": "/",
+        "Roles": [ { "Ref": "IAMRole" } ]
+      }
+    },
+
+    "PHPAppArr" : {
+      "Type" : "AWS::AutoScaling::AutoScalingGroup",
+      "Properties" : {
+        "AvailabilityZones" : { "Ref" : "AZs" },
+        "VPCZoneIdentifier" : [{ "Ref" : "AppPrivateSubnetA" },{ "Ref" : "AppPrivateSubnetB" }],
+        "LaunchConfigurationName" : { "Ref" : "PHPAppArrLaunchConfig" },
+        "MinSize" : { "Ref" : "PHPAppArrMinSize" },
+        "MaxSize" : { "Ref" : "PHPAppArrMaxSize" },
+        "HealthCheckGracePeriod" : 60,
+        "LoadBalancerNames" : [ { "Ref" : "PHPAppArrELB" } ],
+        "Tags": [{"Key": "Name", "Value" : "Infitto App", "PropagateAtLaunch" : "true"}]
+      }
+    },
+  
+    "PHPAppArrLaunchConfig" : {
+      "Type" : "AWS::AutoScaling::LaunchConfiguration",
+      "Properties" : {
+        "KeyName" : { "Ref" : "InstsKey" },
+        "ImageId" : { "Ref" : "PHPAppAmi" },
+        "SecurityGroups" : [{ "Ref" : "PHPAppSG" }, { "Ref" : "SshSG" } ],
+        "InstanceType" : { "Ref" : "PHPAppInstType" },
+        "IamInstanceProfile" : { "Ref" : "PHPInstanceProfile" }
+      }
+    },
+
+    "PHPAppArrScaleUpPolicy" : {
+      "Type" : "AWS::AutoScaling::ScalingPolicy",
+      "Properties" : {
+        "AdjustmentType" : "ChangeInCapacity",
+        "AutoScalingGroupName" : { "Ref" : "PHPAppArr" },
+        "Cooldown" : { "Ref" : "PHPAppArrScaleUpCooldown" },
+        "ScalingAdjustment" : { "Ref" : "PHPAppArrScaleUpAdjustment" }
+      }
+    },
+    "PHPAppArrScaleDownPolicy" : {
+      "Type" : "AWS::AutoScaling::ScalingPolicy",
+      "Properties" : {
+        "AdjustmentType" : "ChangeInCapacity",
+        "AutoScalingGroupName" : { "Ref" : "PHPAppArr" },
+        "Cooldown" : { "Ref" : "PHPAppArrScaleDownCooldown" },
+        "ScalingAdjustment" : { "Ref" : "PHPAppArrScaleDownAdjustment" }
+      }
+    },
+
+    "PHPAppArrCPUAlarmHigh": {
+     "Type": "AWS::CloudWatch::Alarm",
+     "Properties": {
+        "AlarmDescription": "Scale-up if CPU > Threshold",
+        "MetricName": "CPUUtilization",
+        "Namespace": "AWS/EC2",
+        "Statistic": "Average",
+        "Period": { "Ref" : "PHPAppArrAlarmCpuHighPeriod" },
+        "EvaluationPeriods": { "Ref" : "PHPAppArrAlarmCpuHighEvalPeriod"},
+        "Threshold": { "Ref" : "PHPAppArrAlarmCpuHigh" },
+        "AlarmActions": [ { "Ref": "PHPAppArrScaleUpPolicy" } ],
+        "Dimensions": [
+          {
+            "Name": "AutoScalingGroupName",
+            "Value": { "Ref": "PHPAppArr" }
+          }
+        ],
+        "ComparisonOperator": "GreaterThanThreshold"
+      }
+    },
+    "PHPAppArrCPUAlarmLow": {
+     "Type": "AWS::CloudWatch::Alarm",
+     "Properties": {
+        "AlarmDescription": "Scale-down if CPU < Threshold",
+        "MetricName": "CPUUtilization",
+        "Namespace": "AWS/EC2",
+        "Statistic": "Average",
+        "Period": { "Ref" : "PHPAppArrAlarmCpuLowPeriod" },
+        "EvaluationPeriods": { "Ref" : "PHPAppArrAlarmCpuLowEvalPeriod"},
+        "Threshold": { "Ref" : "PHPAppArrAlarmCpuLow" },
+        "AlarmActions": [ { "Ref": "PHPAppArrScaleDownPolicy" } ],
+        "Dimensions": [
+          {
+            "Name": "AutoScalingGroupName",
+            "Value": { "Ref": "PHPAppArr" }
+          }
+        ],
+        "ComparisonOperator": "LessThanThreshold"
+      }
+    },
+
+    "PHPAppArrELB" : {
+      "Type" : "AWS::ElasticLoadBalancing::LoadBalancer",
+      "Properties" : {
+        "Subnets" : [{ "Ref" : "PublicSubnetA" },{ "Ref" : "PublicSubnetB" }],
+        "SecurityGroups" : [{ "Ref" : "ElbSG" }],
+        "CrossZone" : true,
+        "Listeners" : [ {
+          "LoadBalancerPort" : "80",
+          "InstancePort" : "80",
+          "Protocol" : "HTTP"
+        } ],
+        "HealthCheck" : {
+          "Target" : { "Ref" : "PHPAppArrHealthCheckTarget" },
+          "HealthyThreshold" : "3",
+          "UnhealthyThreshold" : "5",
+          "Interval" : "30",
+          "Timeout" : "5"
+        }
+      }
+    },
+
+    "DBSubnetGroup" : {
+      "Type" : "AWS::RDS::DBSubnetGroup",
+      "Properties" : {
+        "DBSubnetGroupDescription" : "Infitto DB Subnet group",
+        "SubnetIds" : [{ "Ref" : "DbPrivateSubnetA" },
+                       { "Ref" : "DbPrivateSubnetB" }],
+        "Tags" : [ {"Key" : "Name", "Value" : "Infitto"} ]
+      }
+    }
+  },
+
+
+  "Outputs": {
+
+    "VpcId" : {
+      "Value" : { "Ref" : "Vpc" },
+      "Description" : "ID for VPC"
+    },
+
+    "SubnetsPublicIds" : {
+      "Value" : { "Fn::Join" : [ ", ", [ { "Ref" : "PublicSubnetA" }, { "Ref" : "PublicSubnetB" } ] ] },
+      "Description" : "IDs for subnets \"Public Subnet A\" and \"Public Subnet B\""
+    },
+
+    "SubnetsAppPrivateIds" : {
+      "Value" : { "Fn::Join" : [ ", ", [ { "Ref" : "AppPrivateSubnetA" }, { "Ref" : "AppPrivateSubnetB" } ] ] },
+      "Description" : "IDs for subnets \"Application Private Subnet A\" and \"Application Private Subnet B\""
+    },
+
+    "SubnetsDbPrivateIds" : {
+      "Value" : { "Fn::Join" : [ ", ", [ { "Ref" : "DbPrivateSubnetA" }, { "Ref" : "DbPrivateSubnetB" } ] ] },
+      "Description" : "IDs for subnets \"Database Private Subnet A\" and \"Database Private Subnet B\""
+    },
+
+    "SshSG" : {
+      "Value" : { "Ref" : "SshSG" },
+      "Description" : "ID for security group \"Ssh-SG\""
+    }
+  }
+}
