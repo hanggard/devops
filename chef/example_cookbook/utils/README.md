@@ -29,7 +29,7 @@ e.g.
   <tr>
     <td><tt>['utils']['bacon']</tt></td>
     <td>Boolean</td>
-    <td>whether to include bacon</td>
+    <td>whether to include bacon </td>
     <td><tt>true</tt></td>
   </tr>
 </table>
